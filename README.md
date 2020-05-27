@@ -1,5 +1,14 @@
 # Provizionare infrastructura
 
+Infrastructura propusa aici cuprinde:
+ - o instalare de Jenkins server in docker cu volume persistente
+ - o instalare de Nexus server in docker cu volume persistente
+ - un cluster de Kubernetes instalat pe 3 masini virtuale provizionate si configurate automat cu vagrant si virtualbox
+
+Am ales sa instalez Jenkins si Nexus separat de clusterul de Kubernetes special pentru a putea pune in evidenta in mod distinct modul de functionare al sistemului de containere docker.
+Atat Jenkins server cat si Nexus ar putea rula foarte similar direct in Kubernetes.
+In modelul prezentat aici Kubernetes are rol de mediu tinta, in care aplicatia ruleaza.
+
 ## Systeme de operare suportate:
  - ubuntu linux
  - centos - programele de mai jos trebuie sa fie instalate corespunzator
