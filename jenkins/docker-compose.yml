@@ -1,0 +1,100 @@
+# Compose este un instrument care ajuta la pornirea de aplicatii sau
+# medii de lucru multicontainer.
+# Fisierul docker-compose contine lista de servicii care vor fi pornite.
+# Deasemeni contine date despre felul in care sunt pornite serviciile.
+# Se poate defini inclusiv ordinea pornirii serviciilor.
+# Fisierul suporta formatul yml sau yaml, un limbaj  de serializare a datelor
+
+version: '3.7'
+# Definim mai jos lista de servicii care vor fi pornite de
+# programul docker-compose folosind acest fisier
+services:
+  # Primul serviciu din lista este denumit master si porneste serverul jenkins
+  # acesta va genera un container docker generat pe baza unei imagini
+  master:
+    # comanda build va construi o imagine bazata pe definitiile
+    # care se gasesc in fisierul Dockerfile din directorul specificat
+    # de campul context
+    build:
+      context: ./jenkins-master/
+      dockerfile: Dockerfile
+    # Mai jos mapez portul 50000 din container la portul 50000 al gazdei
+    # pentru a permite conexiunile de la executori (jenkins slaves)
+    ports:
+      - "50000:50000"
+    # Volumes defineste lista de volume locale ce vor fi montate in container.
+    # Acest lucru ajuta la pastrarea consistenta a datelor si a configuratiilor.
+    volumes:
+      # un volum pentru loguri
+      - jenkins-log:/var/log/jenkins
+      # un volum pentru date legate de build-uri si configuratii
+      - jenkins-data:/var/jenkins_home
+      # montez socket-ul de docker al masinii gazda, pentru a permite acces lui
+      # jenkins la api-ul de docker
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Folosesc o retea de tip docker pentru comunicarea intre containere
+    networks:
+      - jenkins-net
+  # Serviciul nginx are rol de secure reverse proxy
+  nginx:
+    # Construiesc imaginea pe baza definitiilor din dockerfile
+    build:
+      context: ./nginx/
+      dockerfile: Dockerfile
+    # Expun porturile din container pe gazda
+    ports:
+      - "80:80"
+      - "443:443"
+    # Montez un volum unde pastrez certificatele ssl
+    volumes:
+      - jenkins-ssl:/etc/nginx/ssl
+    # Folosesc o retea de tip docker pentru comunicarea intre containere
+    networks:
+      - jenkins-net
+  # Pentru a simplifica am introdus aici si serviciul nexus
+  # Nexus este un repozitor de artefacte. In cazul de fata este un loc in care
+  # stochez imaginile de docker, pe care le folosesc la deployment.
+  nexus:
+    # De data asta imaginea de nexus o folosesc exact asa cum este ea
+    # incarcata in docker hub (hub.docker.com)
+    image: sonatype/nexus3:latest
+    # Expun porturile din container pe gazda
+    ports:
+      - "8081:8081"
+      - "8123:8123"
+    # Montez volumul in care doresc sa pastrez datele in mod consistent.
+    volumes:
+      - nexus-data:/nexus-data
+    # Folosesc o retea de tip docker pentru comunicarea intre containere
+    networks:
+      - jenkins-net
+  # In final am adaugat serviciul slave, care este de fapt un container in care
+  # jenkins poate executa build-uri. Acesta va porni si se va opri imediat.
+  # Va mai fi pornit cand jenkins are nevoie sa execute cod si oprit cand a terminat.
+  slave:
+    build:
+      context: ./jenkins-slave/
+      dockerfile: Dockerfile
+# Urmeaza definitiile volumelor care sunt folosite in containerele de mai sus.
+# Am folosit plugin-ul local-persist pentru a stoca datele in cai specifice pe gazda.
+volumes:
+  jenkins-data:
+    driver: local-persist
+    driver_opts:
+      mountpoint: /opt/jenkins/data
+  jenkins-log:
+    driver: local-persist
+    driver_opts:
+      mountpoint: /opt/jenkins/log
+  jenkins-ssl:
+    driver: local-persist
+    driver_opts:
+      mountpoint: /opt/jenkins/ssl
+  nexus-data:
+    driver: local-persist
+    driver_opts:
+      mountpoint: /opt/nexus/data
+# Definitia retelei, pentru a instrui programul docker sa creeze o retea
+# pentru mediul definit mai sus.
+networks:
+  jenkins-net:
