@@ -65,6 +65,17 @@ In modelul prezentat aici Kubernetes are rol de mediu tinta, in care aplicatia r
 
  `sudo apt-get install build-essential`
 
+ - creeaza structura de directoare necesara pentru persistenta datelor
+
+ ```
+ sudo mkdir -p /opt/jenkins/data
+ sudo mkdir -p /opt/jenkins/log
+ sudo mkdir -p /opt/jenkins/ssl
+ chown -R 1001:1001 /opt/jenkins/*
+ sudo mkdir -p /opt/nexus/data
+ chown -R 200.200 /opt/nexus/data
+```
+
 ## Pornirea si provizionarea infrastructurii
 Vor fi executate pe rand comenzile afisate in makefile.
 
