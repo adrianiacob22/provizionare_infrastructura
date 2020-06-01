@@ -1,12 +1,12 @@
-export VAGRANT_CWD=$PWD/kubernetes
+export VAGRANT_CWD=${PWD}/kubernetes
 
 default: run
 jstart:
-	@echo "================ Pornesc containerele docker =========================="
+	@echo "======= Pornesc containerele docker pentru Jenkins si Nexus ==========="
 	@docker-compose -p jenkins -f jenkins/docker-compose.yml up -d
 	@echo "======================================================================="
 jstop:
-	@echo "================ Opreste containerele docker ========================="
+	@echo "========= Opresc containerele docker (Jenkins si Nexus)================"
 	@docker-compose -p jenkins -f jenkins/docker-compose.yml down
 	@echo "======================================================================="
 jstat:
