@@ -1,3 +1,5 @@
+export VAGRANT_CWD=$PWD/kubernetes
+
 default: run
 jstart:
 	@echo "================ Pornesc containerele docker =========================="
@@ -13,17 +15,14 @@ jstat:
 	@echo "======================================================================="
 kubestart:
 	@echo "========== Pornesc masinile virtuale pentru Kubernetes ================"
-	@export VAGRANT_CWD=$PWD/kubernetes
 	@vagrant up
 	@echo "======================================================================="
 kubestat:
 	@echo "================= Afiseaza starea vm-urilor ==========================="
-	@export VAGRANT_CWD=$PWD/kubernetes
 	@vagrant status
 	@echo "======================================================================="
 kubestop:
 	@echo "================= Opreste mediul Kubernetes ==========================="
-	@export VAGRANT_CWD=$PWD/kubernetes
 	@vagrant halt
 	@echo "======================================================================="
 run: jstart kubestart
