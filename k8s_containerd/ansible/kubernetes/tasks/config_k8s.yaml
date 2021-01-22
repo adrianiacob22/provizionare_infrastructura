@@ -1,0 +1,68 @@
+- name: check if Kubernetes is already configured
+  when:
+    - '"master" in ansible_fqdn'
+  shell: "kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes"
+  register: result
+  ignore_errors: true
+
+- name: Reset Kubernetes component
+  when:
+    - '"master" in ansible_fqdn'
+    - result is succeeded
+  shell: "kubeadm reset --force"
+
+- name: Init Kubernetes cluster
+  when:
+    - '"master" in ansible_fqdn'
+  shell: |
+    kubeadm init --pod-network-cidr {{ pod_network_cidr }} \
+                 --apiserver-advertise-address {{ master }} \
+  register: init_cluster
+
+- name: Create Kubernetes config directory
+  become: false
+  file: path="~/.kube/" state=directory
+  when:
+    - '"master" in ansible_fqdn'
+
+- name: Change permissions of .kube/config
+  file: path="{{ kubeadmin_config }}" mode=0775
+  when:
+    - '"master" in ansible_fqdn'
+
+- name: Copy admin.conf to Home directory
+  when:
+    - '"master" in ansible_fqdn'
+  become: true
+  copy:
+    src: "{{ kubeadmin_config }}"
+    dest: "/home/{{ users }}/.kube/config"
+    owner: "{{ users }}"
+    group: "{{ users }}"
+    mode: 0755
+    remote_src: True
+
+- debug:
+    msg: " Master ip is {{ ansible_eth0.ipv4.address }}"
+  register: master_ip
+  when: '"master" in ansible_fqdn'
+
+- name: Install calico cni and get join command
+  when:
+    - '"master" in ansible_fqdn'
+  shell: |
+    su - {{ users }} -c "kubectl create -f https://docs.projectcalico.org/v3.9/manifests/calico.yaml"
+    sleep 5
+    kubeadm token create --print-join-command > /home/{{ users }}/joincluster.sh
+    chmod 777 /home/{{ users }}/joincluster.sh
+
+- name: Copy the file from k8s-master to {{ ansible_fqdn }}
+  become: false
+  when:
+    - '"node" in ansible_fqdn'
+  shell: scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no {{ master }}:/home/{{ users }}/joincluster.sh /home/{{ users }}/joincluster.sh
+
+- name: Join kubernetes cluster
+  when:
+    - '"node" in ansible_fqdn'
+  shell: /home/{{ users }}/joincluster.sh

@@ -1,0 +1,66 @@
+---
+- name: "Install required packages on CentOS "
+  yum:
+    name:
+    - unzip
+    - tar
+    - btrfs-progs
+    - libseccomp
+    - util-linux
+    - libselinux-python
+    - yum-utils
+    - device-mapper-persistent-data
+    - lvm2
+    state: latest
+
+
+- name: Remove docker in case is installed from CentOS repo
+  yum:
+    name:
+      - docker
+      - docker-client
+      - docker-client-latest
+      - docker-common
+      - docker-latest
+      - docker-latest-logrotate
+      - docker-logrotate
+      - docker-engine
+    state: removed
+
+- name: Add docker yum repository
+  when: docker == "true"
+  shell: | 
+    sudo yum-config-manager \
+    --add-repo \
+    https://download.docker.com/linux/centos/docker-ce.repo
+  become: yes
+
+- name: Install Docker on CentOS 
+  when: docker == "true"
+  yum:
+    name: docker-ce-{{ docker_version }}
+    state: present
+
+- name: Start Docker service
+  when: docker == "true"
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Add users to docker group
+  user:
+    name: "{{ item }}"
+    groups: docker
+    append: yes
+  with_items:
+  - "{{ users }}"
+
+- name: "Add IP address of all hosts to all hosts"
+  blockinfile:
+    dest: /etc/hosts
+    block: |
+      10.2.5.149 k8s-master k8s-master.novalocal
+      10.2.5.59 k8s-node1 k8s-node1.novalocal
+      10.2.5.132 k8s-node2 k8s-node2.novalocal
+      10.2.5.63 k8s-node3 k8s-node3.novalocal
