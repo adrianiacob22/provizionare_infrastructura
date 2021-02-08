@@ -1,0 +1,98 @@
+// namespace-credential-injection pipeline
+
+node ('kube_pod_slave') {
+
+    // To add a configmap to kubernetes, just populate configmaps configuration file
+
+    def credentials_list = [
+        'docker-registry': [
+            [
+                'name': 'somename',
+                'docker-server': 'some-server',
+                'docker-email': 'docker-email',
+                'credentialid': 'credential-id'
+        ]
+        ]
+    ] 
+    // Create a map of jenkins credentials and desired names. Key should be actual credential.
+    // Value can be the desired secret name.
+    def secrets_list = [
+        'credential': 'secret-name' ,
+        'credential-2': 'secret-name-2'
+        ]
+
+    stage ('List current secrets and configmaps') {
+        
+        sh '''
+            kubectl get secrets
+            kubectl get configmap
+        '''
+    }
+    
+    stage ('Adding the docker_registry secrets') {
+           
+        credentials_list['docker-registry'].each { credential ->
+
+            withCredentials([usernamePassword(credentialsId: credential['credentialid'], usernameVariable: 'CREDENTIAL_USERNAME', passwordVariable: 'CREDENTIAL_PASSWORD')]) {
+                env.SECRET_NAME = credential['name']
+                env.DOCKER_SERVER = credential['docker-server']
+                env.DOCKER_EMAIL = credential['docker-email']
+                // See: 
+                //     kubectl create secret docker-registry --help
+                // for more information
+                sh '''
+                    # Disable exit on non 0 so that the job does not exit if we try to delete a secret that does not exist
+                    set +e
+                    kubectl delete secret ${SECRET_NAME}
+                    # Re-enable exit on non 0
+                    set -e
+                    kubectl create secret docker-registry \
+                    ${SECRET_NAME} \
+                    --docker-server=${DOCKER_SERVER} \
+                    --docker-username=${CREDENTIAL_USERNAME} \
+                    --docker-password=${CREDENTIAL_PASSWORD} \
+                    --docker-email=${DOCKER_EMAIL}
+                '''
+            }
+        }
+    }
+    // For configmaps you need to add them in a jenkins configuration file
+    stage ('Apply configmaps') {
+        sh "touch /home/jenkins/workspace/configmaps.yaml"
+        configFileProvider(
+        [configFile(fileId: 'configmaps', variable: 'cm_file')]) {
+            def configs = load cm_file
+            def cm = configs.cm
+                for (i = 0; i < cm.size(); i++) {
+                writeFile file: "/home/jenkins/workspace/configmaps.yaml", text: cm[i]
+                
+                sh """
+                kubectl apply -f /home/jenkins/workspace/configmaps.yaml
+                """ 
+                }
+        }
+    }
+    
+    stage ('Apply other secrets') {
+            secrets_list.each { secret,name ->
+            withCredentials([file(credentialsId: secret, variable: 'FILE')]) {
+                env.SECRET_NAME = name
+                sh '''
+                set +e
+                kubectl delete secret ${SECRET_NAME} 
+                set -e
+                
+                kubectl create secret generic ${SECRET_NAME} --from-file=${FILE}
+                '''
+            }
+        }
+    }
+    
+    stage ('List final secrets and configmaps') {
+        sh '''
+            kubectl get secrets
+            kubectl get configmap
+        '''
+    }
+    
+}
